@@ -6,3 +6,10 @@ def test_counts_simple_text():
     assert stats["lines"] == 2
     assert stats["words"] == 4
     assert stats["chars"] == 23
+
+
+def test_counts_empty_text():
+    stats = count_stats("")
+    assert stats["lines"] == 0
+    assert stats["words"] == 0
+    assert stats["chars"] == 0
