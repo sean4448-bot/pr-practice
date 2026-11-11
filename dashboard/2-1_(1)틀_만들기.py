@@ -1,0 +1,399 @@
+# -*- coding: utf-8 -*-
+"""[내부망 주피터 · 최초 1회] 대시보드 틀(화면)을 만든다. 실행하면 현재 폴더에 2-1_대시보드_틀.html 이 생긴다.
+
+화면을 바꿨을 때만 다시 실행한다. 숫자는 들어 있지 않다(숫자는 2-1 청약현황 코드가 누적 데이터에서 채운다).
+- 청약월 탭: 누적 데이터에 들어 있는 모든 달(예: 10월·11월)이 탭으로 나오고, 기본은 가장 최근 달·최근 일차.
+- 월별 비교 표·누적 추이 그래프로 달끼리 같은 일차를 나란히 본다.
+- 이 파일은 2-1_대시보드_누적데이터.json 을 건드리지 않는다. 기존 틀은 2-1_대시보드_틀_백업.html 로 보관한다."""
+
+import os, shutil
+
+OUT = '2-1_대시보드_틀.html'
+
+HTML = r'''<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__TITLE__</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1d2433;--mute:#697386;--line:#e3e6ec;--acc:#0e8a8a;--acc2:#e3a02b;--up:#d63a3a;--dn:#2c6ed5;--chip:#eef1f5;--hi:#e8f6f6;--grid:#e9ecf1}
+@media (prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--ink:#e8ebf0;--mute:#9aa4b5;--line:#2c3441;--acc:#3cc0bf;--acc2:#f0b650;--up:#ff6b6b;--dn:#6ea3ff;--chip:#262e3a;--hi:#1f3a3b;--grid:#262d38}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 2px}
+h2{font-size:15px;margin:0 0 10px}
+.sub{color:var(--mute);font-size:12px;margin-bottom:12px}
+.bar{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tabs .lb{color:var(--mute);font-size:12px;min-width:34px}
+button.chip{border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:5px 12px;border-radius:16px;cursor:pointer;font:inherit;font-size:13px}
+button.chip.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+button.chip.dis{opacity:.4;cursor:default}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.empty{color:var(--mute);text-align:center;padding:40px 16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi .t{color:var(--mute);font-size:12px}
+.kpi .v{font-size:22px;font-weight:700;margin:2px 0}
+.kpi .v small{font-size:13px;font-weight:400;color:var(--mute);margin-left:2px}
+.kpi .d{font-size:12px}
+.up{color:var(--up)}
+.dn{color:var(--dn)}
+.mu{color:var(--mute)}
+b.k{color:var(--acc)}
+.cmt .ln{white-space:pre-wrap;word-break:keep-all;margin:2px 0}
+.cmt textarea{width:100%;min-height:150px;font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px;white-space:pre-wrap}
+.cmt .btns{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.cmt .hint{color:var(--mute);font-size:11px;margin-top:6px}
+button.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:4px 12px;border-radius:6px;cursor:pointer;font:inherit;font-size:12px}
+button.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.head h2{margin:0}
+table.tb{width:100%;border-collapse:collapse;font-size:13px}
+table.tb th{color:var(--mute);font-weight:600;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.tb td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.tb th:first-child,table.tb td:first-child{text-align:left}
+table.tb tr.hi td{background:var(--hi)}
+table.tb tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+table.tb td.l,table.tb th.l{text-align:left}
+.scroll{overflow-x:auto}
+.i1{padding-left:20px!important}
+.i2{padding-left:40px!important}
+.meter{display:inline-block;width:56px;height:6px;background:var(--chip);border-radius:3px;margin-left:6px;vertical-align:middle;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--acc)}
+.meter i.over{background:var(--up)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.hb{display:grid;grid-template-columns:96px 1fr auto;gap:8px;align-items:center;margin:5px 0;font-size:13px}
+.hb .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb .bar2{height:10px;background:var(--chip);border-radius:5px;overflow:hidden}
+.hb .bar2 i{display:block;height:100%;background:var(--acc);border-radius:5px}
+.hb .v{color:var(--mute);font-size:12px;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mute);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+svg.ch{width:100%;height:auto;display:block}
+svg.ch text{fill:var(--mute);font-size:11px;font-family:inherit}
+svg.ch text.vl{fill:var(--ink)}
+svg.ch .gl{stroke:var(--grid);stroke-width:1}
+details summary{cursor:pointer;color:var(--mute);font-size:12px;margin-top:8px}
+.note{color:var(--mute);font-size:11px;margin-top:6px}
+.foot{color:var(--mute);font-size:11px;text-align:center;margin:18px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>__TITLE__</h1>
+    <div class="sub" id="sub"></div>
+  </header>
+  <div class="bar">
+    <div class="tabs"><span class="lb">청약월</span><span id="months" class="tabs"></span></div>
+    <div class="tabs"><span class="lb">일차</span><span id="days" class="tabs"></span></div>
+  </div>
+  <main id="main"></main>
+  <div class="foot">단위: 억원(별도 표기 제외) · 코멘트 편집 내용은 이 PC 브라우저에만 저장됩니다</div>
+</div>
+<script>
+var DATA = /*__DATA__*/null;
+(function(){
+var PRODS = ['3년 이표','3년 복리','5년','10년','20년'];
+var PAL = ['#8a94a6','#e3a02b','#7a6fd6','#d6638a','#4aa3df','#58b368'];
+var main = document.getElementById('main');
+var months = [];
+var sel = {ym:null, n:1, tb:'all', edit:false};
+
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function sum(a){ var s=0,i; if(!a) return 0; for(i=0;i<a.length;i++) s+=(a[i]||0); return s; }
+function fmt(v,d){ return Number(v).toLocaleString('ko-KR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function f1(v){ return fmt(v/10,1); }
+function fe(v){ return fmt(v,1); }
+function fi(v){ return fmt(v,0); }
+function nice(v){ if(v<=0) return 1; var p=Math.pow(10,Math.floor(Math.log(v)/Math.LN10)); var m=v/p; var n=m<=1?1:(m<=2?2:(m<=2.5?2.5:(m<=5?5:10))); return n*p; }
+function dlt(v,unit,div){
+  var x=v/(div||1);
+  if(Math.abs(x)<0.05) return '<span class="mu">변동 없음</span>';
+  return '<span class="'+(x>0?'up':'dn')+'">'+(x>0?'▲ ':'▼ ')+fmt(Math.abs(x),unit==='건'?0:1)+unit+'</span>';
+}
+function ymLabel(ym){
+  var years={},i; for(i=0;i<months.length;i++) years[months[i].slice(0,4)]=1;
+  var multi=Object.keys(years).length>1;
+  return (multi?ym.slice(2,4)+'.':'')+parseInt(ym.slice(5,7),10)+'월';
+}
+function snapsOf(ym){
+  var o=DATA[ym]||{};
+  return Object.keys(o).map(Number).sort(function(a,b){return a-b;}).map(function(k){return o[String(k)];});
+}
+function getSnap(ym,n){ var o=DATA[ym]; return o? (o[String(n)]||null):null; }
+function latestN(ym){ var a=snapsOf(ym); return a.length? a[a.length-1].n:1; }
+function mdLabel(d){ return d? d.slice(5,7)+'/'+d.slice(8,10):''; }
+
+function mk(line){
+  var t=esc(line);
+  t=t.replace(/\*\*(.+?)\*\*/g,'<b class="k">$1</b>');
+  t=t.replace(/\^\^(.+?)\^\^/g,'<span class="up">$1</span>');
+  t=t.replace(/~~(.+?)~~/g,'<span class="dn">$1</span>');
+  return t;
+}
+function ckey(s){ return 'c21:'+sel.ym+':'+s.n; }
+function draft(s){ return (s.comment||[]).join('\n'); }
+function getComment(s){
+  var raw=null;
+  try{ raw=localStorage.getItem(ckey(s)); }catch(e){}
+  return (raw===null||raw===undefined)? draft(s):raw;
+}
+
+/* ───── 탭 ───── */
+function renderTabs(){
+  var h='',i;
+  for(i=0;i<months.length;i++){
+    h+='<button class="chip'+(months[i]===sel.ym?' on':'')+'" data-act="m" data-v="'+months[i]+'">'+ymLabel(months[i])+'</button>';
+  }
+  document.getElementById('months').innerHTML=h;
+  var last=snapsOf(sel.ym); var tot=last.length? (last[last.length-1].N_total||last[last.length-1].n):1;
+  h='';
+  for(i=1;i<=tot;i++){
+    var has=!!getSnap(sel.ym,i);
+    h+='<button class="chip'+(i===sel.n?' on':'')+(has?'':' dis')+'" data-act="d" data-v="'+i+'"'+(has?'':' title="아직 자료 없음"')+'>'+i+'일차</button>';
+  }
+  document.getElementById('days').innerHTML=h;
+}
+
+/* ───── KPI ───── */
+function kpiCard(t,v,u,d){ return '<div class="kpi"><div class="t">'+t+'</div><div class="v">'+v+'<small>'+u+'</small></div><div class="d">'+d+'</div></div>'; }
+function kpi(s){
+  var J=sum(s.j),T=sum(s.t),TT=J+T,p=s.prev;
+  var lbl=p? '전월('+p.month+'월) '+s.n+'일차 대비 ':'';
+  var no='<span class="mu">전월 비교 자료 없음</span>';
+  var PJ=p?sum(p.j):0, PT=p?sum(p.t):0;
+  var h='<div class="grid">';
+  h+=kpiCard('당사 누적 합계',f1(TT),'억원',p? lbl+dlt(TT-(PJ+PT),'억원',10):no);
+  h+=kpiCard('전용계좌',f1(J),'억원',p? lbl+dlt(J-PJ,'억원',10):('전체의 '+(TT?fmt(J/TT*100,1):'0.0')+'%'));
+  h+=kpiCard('퇴직연금계좌',f1(T),'억원',p? lbl+dlt(T-PT,'억원',10):('전체의 '+(TT?fmt(T/TT*100,1):'0.0')+'%'));
+  var cnt=(s.jn||0)+(s.tn||0);
+  h+=kpiCard('청약 건수',fi(cnt),'건',p? lbl+dlt(cnt-((p.jn||0)+(p.tn||0)),'건',1):'');
+  if(s.limits) h+=kpiCard('총 발행한도',fi(sum(s.limits)),'억원','5개 종목 한도 합계');
+  return h+'</div>';
+}
+
+/* ───── 코멘트 ───── */
+function commentBox(s){
+  var raw=getComment(s),h='<div class="card cmt"><div class="head"><h2>코멘트</h2><span>';
+  if(sel.edit){
+    h+='</span></div><textarea id="cmt">'+esc(raw)+'</textarea>';
+    h+='<div class="btns"><button class="btn pri" data-act="save">저장</button><button class="btn" data-act="cancel">취소</button><button class="btn" data-act="reset">초안으로 되돌리기</button></div>';
+    h+='<div class="hint">표시 규칙: **굵게(청록)**, ^^빨강^^, ~~파랑~~ · 줄 앞 공백 두 칸은 들여쓰기</div>';
+  }else{
+    h+='<button class="btn" data-act="copy">복사</button> <button class="btn" data-act="edit">편집</button></span></div>';
+    var lines=raw.split('\n'),i,b='';
+    for(i=0;i<lines.length;i++) b+='<div class="ln">'+(mk(lines[i])||'&nbsp;')+'</div>';
+    h+=raw.replace(/\s/g,'')? b:'<div class="mu">코멘트가 없습니다. 편집을 눌러 입력하세요.</div>';
+  }
+  return h+'</div>';
+}
+
+/* ───── 월 비교 ───── */
+function lineChart(){
+  var W=640,H=250,pl=52,pr=18,pt=16,pb=30,maxN=1,maxV=0,i,k;
+  for(i=0;i<months.length;i++){
+    var a=snapsOf(months[i]);
+    for(k=0;k<a.length;k++){
+      var v=(sum(a[k].j)+sum(a[k].t))/10;
+      if(a[k].n>maxN) maxN=a[k].n; if(v>maxV) maxV=v;
+    }
+    if(a.length && (a[a.length-1].N_total||0)>maxN) maxN=a[a.length-1].N_total;
+  }
+  var top=nice(maxV);
+  function X(n){ return maxN<=1? pl+(W-pl-pr)/2 : pl+(n-1)/(maxN-1)*(W-pl-pr); }
+  function Y(v){ return pt+(1-v/top)*(H-pt-pb); }
+  var h='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="월별 누적 청약금액 추이">';
+  for(i=0;i<=4;i++){
+    var gv=top*i/4,gy=Y(gv);
+    h+='<line class="gl" x1="'+pl+'" x2="'+(W-pr)+'" y1="'+gy+'" y2="'+gy+'"/><text x="'+(pl-6)+'" y="'+(gy+4)+'" text-anchor="end">'+fi(gv)+'</text>';
+  }
+  for(k=1;k<=maxN;k++) h+='<text x="'+X(k)+'" y="'+(H-10)+'" text-anchor="middle">'+k+'일차</text>';
+  var order=months.slice().sort(function(a,b){ return (a===sel.ym?1:0)-(b===sel.ym?1:0); });
+  for(i=0;i<order.length;i++){
+    var ym=order[i],col=(ym===sel.ym)?'var(--acc)':PAL[months.indexOf(ym)%PAL.length],sn=snapsOf(ym),pts=[],cs='';
+    for(k=0;k<sn.length;k++) pts.push(X(sn[k].n)+','+Y((sum(sn[k].j)+sum(sn[k].t))/10));
+    if(pts.length>1) h+='<polyline fill="none" stroke="'+col+'" stroke-width="'+(ym===sel.ym?3:2)+'" points="'+pts.join(' ')+'"/>';
+    for(k=0;k<sn.length;k++){
+      var vv=(sum(sn[k].j)+sum(sn[k].t))/10,cx=X(sn[k].n),cy=Y(vv);
+      h+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(ym===sel.ym?4:3)+'" fill="'+col+'"/>';
+      if(sn[k].n===sn[sn.length-1].n) h+='<text class="vl" x="'+cx+'" y="'+(cy-8)+'" text-anchor="middle">'+fe(vv)+'</text>';
+    }
+  }
+  h+='</svg><div class="legend">';
+  for(i=0;i<months.length;i++) h+='<span><i style="background:'+(months[i]===sel.ym?'var(--acc)':PAL[i%PAL.length])+'"></i>'+ymLabel(months[i])+'</span>';
+  return h+'</div>';
+}
+function cmpMonths(s){
+  var h='<div class="card"><h2>월별 비교 — '+s.n+'일차 누적 기준</h2><div class="scroll"><table class="tb"><tr><th>청약월</th><th>기준일</th><th>합계</th><th>전용계좌</th><th>퇴직연금계좌</th><th>전용 비중</th><th>건수</th><th>직전 월 대비</th></tr>';
+  var i,prevTT=null;
+  for(i=0;i<months.length;i++){
+    var x=getSnap(months[i],s.n);
+    if(!x){ h+='<tr><td>'+ymLabel(months[i])+'</td><td colspan="7" class="mu">'+s.n+'일차 자료 없음</td></tr>'; prevTT=null; continue; }
+    var J=sum(x.j),T=sum(x.t),TT=J+T;
+    h+='<tr'+(months[i]===sel.ym?' class="hi"':'')+'><td>'+ymLabel(months[i])+'</td><td>'+mdLabel(x.date)+'</td><td>'+f1(TT)+'</td><td>'+f1(J)+'</td><td>'+f1(T)+'</td><td>'+(TT?fmt(J/TT*100,1):'0.0')+'%</td><td>'+fi((x.jn||0)+(x.tn||0))+'</td><td>'+(prevTT===null?'<span class="mu">-</span>':dlt(TT-prevTT,'억원',10))+'</td></tr>';
+    prevTT=TT;
+  }
+  h+='</table></div><div style="margin-top:12px">'+lineChart()+'</div></div>';
+  return h;
+}
+
+/* ───── 일별 ───── */
+function dailyChart(s){
+  var d=s.daily; if(!d||!d.length) return '';
+  var W=640,H=250,pl=48,pr=14,pt=22,pb=30,i,p=s.prev&&s.prev.daily?s.prev.daily:null;
+  var mx=0,tot=[],ptot=[];
+  for(i=0;i<d.length;i++){
+    var j=d[i].jn-d[i].jc,t=d[i].tn-d[i].tc; tot.push([j,t]);
+    if(j+t>mx) mx=j+t;
+    if(p&&p[i]){ var pv=(p[i].jn-p[i].jc)+(p[i].tn-p[i].tc); ptot.push(pv); if(pv>mx) mx=pv; } else ptot.push(null);
+  }
+  var top=nice(mx/10);
+  function Y(v){ return pt+(1-v/top)*(H-pt-pb); }
+  var band=(W-pl-pr)/d.length,bw=Math.min(54,band*0.55);
+  var h='<div class="card"><h2>일별 청약금액 (순증)</h2><svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="일별 청약금액">';
+  for(i=0;i<=4;i++){ var gv=top*i/4,gy=Y(gv); h+='<line class="gl" x1="'+pl+'" x2="'+(W-pr)+'" y1="'+gy+'" y2="'+gy+'"/><text x="'+(pl-6)+'" y="'+(gy+4)+'" text-anchor="end">'+fi(gv)+'</text>'; }
+  for(i=0;i<d.length;i++){
+    var cx=pl+band*(i+0.5),jv=Math.max(0,tot[i][0])/10,tv=Math.max(0,tot[i][1])/10;
+    var yj=Y(jv),yt=Y(jv+tv);
+    h+='<rect x="'+(cx-bw/2)+'" y="'+yj+'" width="'+bw+'" height="'+(Y(0)-yj)+'" fill="var(--acc)"/>';
+    h+='<rect x="'+(cx-bw/2)+'" y="'+yt+'" width="'+bw+'" height="'+(yj-yt)+'" fill="var(--acc2)"/>';
+    h+='<text class="vl" x="'+cx+'" y="'+(yt-5)+'" text-anchor="middle">'+fe(jv+tv)+'</text>';
+    h+='<text x="'+cx+'" y="'+(H-10)+'" text-anchor="middle">'+(d[i].k||i+1)+'일차</text>';
+    if(ptot[i]!==null){ var py=Y(ptot[i]/10); h+='<line x1="'+(cx-bw/2-4)+'" x2="'+(cx+bw/2+4)+'" y1="'+py+'" y2="'+py+'" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/>'; }
+  }
+  h+='</svg><div class="legend"><span><i style="background:var(--acc)"></i>전용계좌</span><span><i style="background:var(--acc2)"></i>퇴직연금계좌</span>'+(p?'<span><i style="background:none;border-top:2px dashed var(--ink);height:0;border-radius:0"></i>전월 같은 일차</span>':'')+'</div>';
+  h+='<details><summary>일별 상세 보기</summary><div class="scroll"><table class="tb"><tr><th>일차</th><th>일자</th><th>전용 신규</th><th>전용 취소</th><th>전용 순증</th><th>퇴직 신규</th><th>퇴직 취소</th><th>퇴직 순증</th><th>일 합계</th><th>누적</th></tr>';
+  var cum=0;
+  for(i=0;i<d.length;i++){
+    var jn=d[i].jn-d[i].jc,tn=d[i].tn-d[i].tc; cum+=jn+tn;
+    h+='<tr><td>'+(d[i].k||i+1)+'일차</td><td>'+mdLabel(s.dates?s.dates[i]:'')+'</td><td>'+f1(d[i].jn)+'</td><td>'+f1(d[i].jc)+'</td><td>'+f1(jn)+'</td><td>'+f1(d[i].tn)+'</td><td>'+f1(d[i].tc)+'</td><td>'+f1(tn)+'</td><td>'+f1(jn+tn)+'</td><td>'+f1(cum)+'</td></tr>';
+  }
+  return h+'</table></div></details></div>';
+}
+
+/* ───── 종목별 ───── */
+function prodTable(s){
+  var lim=s.limits,l0=s.limits0,p=s.prev,i,h='<div class="card"><h2>종목별 현황</h2><div class="scroll"><table class="tb"><tr><th>구분</th><th>종목</th><th>발행한도</th><th>청약금액</th><th>청약률</th><th>전월 같은 일차</th><th>증감</th></tr>';
+  for(i=0;i<5;i++){
+    var amt=s.j[i],pa=p?p.j[i]:null,rate=null;
+    if(i<3&&lim&&lim[i]) rate=((s.jr&&s.jr[i]!==undefined?s.jr[i]:amt/10)/lim[i])*100;
+    var limTxt=lim?fi(lim[i])+((l0&&l0[i]!==lim[i])?' <small class="mu">(당초 '+fi(l0[i])+')</small>':''):'-';
+    h+='<tr><td>'+(i===0?'전용계좌':'')+'</td><td class="l">'+PRODS[i]+'</td><td>'+limTxt+'</td><td>'+f1(amt)+'</td><td>'+(rate===null?'<span class="mu">-</span>':fmt(rate,1)+'%<span class="meter"><i class="'+(rate>100?'over':'')+'" style="width:'+Math.min(100,rate)+'%"></i></span>')+'</td><td>'+(pa===null?'-':f1(pa))+'</td><td>'+(pa===null?'-':dlt(amt-pa,'억원',10))+'</td></tr>';
+  }
+  h+='<tr class="tot"><td colspan="3" class="l">전용계좌 합계</td><td>'+f1(sum(s.j))+'</td><td></td><td>'+(p?f1(sum(p.j)):'-')+'</td><td>'+(p?dlt(sum(s.j)-sum(p.j),'억원',10):'-')+'</td></tr>';
+  var tn=['10년','20년'];
+  for(i=0;i<2;i++){
+    var ta=s.t[i],tp=p?p.t[i]:null;
+    h+='<tr><td>'+(i===0?'퇴직연금계좌':'')+'</td><td class="l">'+tn[i]+'</td><td>'+(lim?fi(lim[3+i]):'-')+'</td><td>'+f1(ta)+'</td><td><span class="mu">-</span></td><td>'+(tp===null?'-':f1(tp))+'</td><td>'+(tp===null?'-':dlt(ta-tp,'억원',10))+'</td></tr>';
+  }
+  h+='<tr class="tot"><td colspan="3" class="l">퇴직연금계좌 합계</td><td>'+f1(sum(s.t))+'</td><td></td><td>'+(p?f1(sum(p.t)):'-')+'</td><td>'+(p?dlt(sum(s.t)-sum(p.t),'억원',10):'-')+'</td></tr>';
+  h+='</table></div><div class="note">청약률은 3년·5년 종목의 전용계좌 기준입니다. 10년·20년은 한도를 시장 전체가 공유하므로 청약률을 표시하지 않습니다.</div></div>';
+  return h;
+}
+
+/* ───── 당사 구성 ───── */
+function compTable(s){
+  var c=s.comp; if(!c||!c.length) return '';
+  var h='<div class="card"><h2>당사 구성 (계좌·채널)</h2><div class="scroll"><table class="tb"><tr><th>구분</th><th>건수</th><th>건수 비중</th><th>금액</th><th>금액 비중</th><th>건당 평균(만원)</th></tr>',i;
+  for(i=0;i<c.length;i++){
+    var r=c[i];
+    h+='<tr'+(r.total?' class="tot"':'')+'><td class="'+(r.lv===1?'i1':(r.lv===2?'i2':''))+'">'+esc(r.name)+'</td><td>'+fi(r.n)+'</td><td>'+fmt(r.ns/10,1)+'%</td><td>'+f1(r.a)+'</td><td>'+fmt(r.as_/10,1)+'%</td><td>'+fi(r.avg)+'</td></tr>';
+  }
+  return h+'</table></div></div>';
+}
+
+/* ───── 영업점 TOP5 ───── */
+function hbars(list,key){
+  if(!list||!list.length) return '<div class="mu">자료 없음</div>';
+  var mx=0,i,h='';
+  for(i=0;i<list.length;i++) if(list[i][key]>mx) mx=list[i][key];
+  for(i=0;i<list.length;i++){
+    var it=list[i];
+    h+='<div class="hb"><span class="nm" title="'+esc(it.name)+'">'+(i+1)+'. '+esc(it.name)+'</span><span class="bar2"><i style="width:'+(mx?it[key]/mx*100:0)+'%"></i></span><span class="v">'+fe(it.a)+'억 · '+fi(it.n)+'건</span></div>';
+  }
+  return h;
+}
+function top5(s){
+  var t=s.top5; if(!t) return '';
+  var tabs=[['all','합계'],['j','전용'],['t','퇴직']],h='<div class="card"><div class="head"><h2>영업점 TOP5 (WM)</h2><span class="tabs">',i;
+  for(i=0;i<tabs.length;i++) h+='<button class="chip'+(sel.tb===tabs[i][0]?' on':'')+'" data-act="tb" data-v="'+tabs[i][0]+'">'+tabs[i][1]+'</button>';
+  var d=t[sel.tb]||t.all;
+  h+='</span></div><div class="two"><div><div class="mu" style="margin-bottom:4px">청약금액 기준</div>'+hbars(d.by_a,'a')+'</div><div><div class="mu" style="margin-bottom:4px">청약건수 기준</div>'+hbars(d.by_n,'n')+'</div></div></div>';
+  return h;
+}
+
+/* ───── 시장(마지막 일차) ───── */
+function market(s){
+  var mk=s.market; if(!mk||!mk.length) return '';
+  var rows=mk.map(function(m){ return {name:m.name,a:m.y10,b:m.y20,t:m.y10+m.y20,mine:!!m.mine}; }).sort(function(x,y){ return y.t-x.t; });
+  var tTot=0,i,me=null; for(i=0;i<rows.length;i++){ tTot+=rows[i].t; if(rows[i].mine) me=rows[i]; }
+  var J=sum(s.j)/10,h='<div class="card"><h2>시장 현황 (퇴직연금, 타사 취합)</h2>';
+  if(me){
+    var rk=1; for(i=0;i<rows.length;i++) if(!rows[i].mine&&rows[i].t>me.t) rk++;
+    var all=tTot+J; h+='<div style="margin-bottom:8px">퇴직연금 시장 점유율 <b class="k">'+fmt(tTot?me.t/tTot*100:0,1)+'%</b>('+rk+'위) · 전용계좌 포함 <b class="k">'+fmt(all?(me.t+J)/all*100:0,1)+'%</b></div>';
+  }
+  h+='<div class="scroll"><table class="tb"><tr><th>사업자</th><th>10년</th><th>20년</th><th>합계</th><th>비중</th></tr>';
+  for(i=0;i<rows.length;i++) h+='<tr'+(rows[i].mine?' class="hi"':'')+'><td>'+esc(rows[i].name)+'</td><td>'+fe(rows[i].a)+'</td><td>'+fe(rows[i].b)+'</td><td>'+fe(rows[i].t)+'</td><td>'+fmt(tTot?rows[i].t/tTot*100:0,1)+'%</td></tr>';
+  h+='<tr class="tot"><td>시장 합계</td><td>'+fe(sum(rows.map(function(r){return r.a;})))+'</td><td>'+fe(sum(rows.map(function(r){return r.b;})))+'</td><td>'+fe(tTot)+'</td><td>100.0%</td></tr></table></div>';
+  if(s.alloc){
+    h+='<h2 style="margin-top:14px">당사 배정금액</h2><div class="scroll"><table class="tb"><tr><th>구분</th><th>종목</th><th>배정금액</th></tr>';
+    for(i=0;i<5;i++) h+='<tr><td>'+(i===0?'전용계좌':'')+'</td><td class="l">'+PRODS[i]+'</td><td>'+fe(s.alloc.j[i]||0)+'</td></tr>';
+    h+='<tr><td>퇴직연금계좌</td><td class="l">10년</td><td>'+fe(s.alloc.t[0]||0)+'</td></tr><tr><td></td><td class="l">20년</td><td>'+fe(s.alloc.t[1]||0)+'</td></tr></table></div>';
+  }
+  return h+'</div>';
+}
+
+/* ───── 렌더 ───── */
+function render(){
+  renderTabs();
+  var s=getSnap(sel.ym,sel.n);
+  if(!s){ main.innerHTML='<div class="card empty">'+ymLabel(sel.ym)+' '+sel.n+'일차 자료가 아직 없습니다.</div>'; return; }
+  document.getElementById('sub').textContent='기준일 '+s.date+' · '+ymLabel(sel.ym)+' '+s.n+'일차 / 총 '+(s.N_total||s.n)+'일';
+  main.innerHTML=kpi(s)+commentBox(s)+cmpMonths(s)+dailyChart(s)+prodTable(s)+compTable(s)+top5(s)+market(s);
+}
+function copyText(txt){
+  function fb(){ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} document.body.removeChild(ta); }
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).catch(fb); } else fb();
+}
+document.addEventListener('click',function(e){
+  var t=e.target,a=null;
+  while(t&&t!==document){ if(t.getAttribute&&t.getAttribute('data-act')){ a=t; break; } t=t.parentNode; }
+  if(!a) return;
+  var act=a.getAttribute('data-act'),v=a.getAttribute('data-v'),s=getSnap(sel.ym,sel.n);
+  if(act==='m'){ sel.ym=v; sel.n=latestN(v); sel.edit=false; }
+  else if(act==='d'){ if(!getSnap(sel.ym,Number(v))) return; sel.n=Number(v); sel.edit=false; }
+  else if(act==='tb'){ sel.tb=v; }
+  else if(act==='edit'){ sel.edit=true; }
+  else if(act==='cancel'){ sel.edit=false; }
+  else if(act==='save'&&s){ try{ localStorage.setItem(ckey(s),document.getElementById('cmt').value); }catch(err){ alert('이 브라우저에서는 저장할 수 없습니다.'); } sel.edit=false; }
+  else if(act==='reset'&&s){ try{ localStorage.removeItem(ckey(s)); }catch(err){} sel.edit=false; }
+  else if(act==='copy'&&s){ copyText(getComment(s).replace(/\*\*|\^\^|~~/g,'')); a.textContent='복사됨'; return; }
+  render();
+});
+
+if(!DATA||!Object.keys(DATA).length){
+  main.innerHTML='<div class="card empty">표시할 데이터가 없습니다. 2-1 청약현황 코드를 실행한 뒤 다시 여세요.</div>';
+}else{
+  months=Object.keys(DATA).sort();
+  sel.ym=months[months.length-1];
+  sel.n=latestN(sel.ym);
+  render();
+}
+})();
+</script>
+</body>
+</html>
+'''
+
+assert '/*__DATA__*/null' in HTML and '__TITLE__' in HTML, '틀 내용이 올바르지 않습니다.'
+if os.path.exists(OUT):
+    shutil.copy(OUT, '2-1_대시보드_틀_백업.html')
+    print('기존 틀을 2-1_대시보드_틀_백업.html 로 보관했습니다.')
+with open(OUT, 'w', encoding='utf-8', newline='\n') as f:
+    f.write(HTML)
+print('완료:', os.path.abspath(OUT), '→ 이어서 2-1 청약현황 코드를 실행하세요.')
