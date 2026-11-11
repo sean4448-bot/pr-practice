@@ -4,7 +4,8 @@
 화면을 바꿨을 때만 다시 실행한다. 숫자는 들어 있지 않다(숫자는 2-1 청약현황 코드가 누적 데이터에서 채운다).
 - 청약월 탭: 누적 데이터에 들어 있는 모든 달(예: 10월·11월)이 탭으로 나오고, 기본은 가장 최근 달·최근 일차.
 - 월별 비교 표·누적 추이 그래프로 달끼리 같은 일차를 나란히 본다.
-- 이 파일은 2-1_대시보드_누적데이터.json 을 건드리지 않는다. 기존 틀은 2-1_대시보드_틀_백업.html 로 보관한다."""
+- 이 파일은 2-1_대시보드_누적데이터.json 을 건드리지 않는다. 기존 틀은 2-1_대시보드_틀_백업.html 로 보관한다.
+- 들여쓰기가 필요한 줄이 없다(복사 중 줄 앞 공백이 사라져도 실행된다)."""
 
 import os, shutil
 
@@ -390,10 +391,9 @@ if(!DATA||!Object.keys(DATA).length){
 </html>
 '''
 
-assert '/*__DATA__*/null' in HTML and '__TITLE__' in HTML, '틀 내용이 올바르지 않습니다.'
-if os.path.exists(OUT):
-    shutil.copy(OUT, '2-1_대시보드_틀_백업.html')
-    print('기존 틀을 2-1_대시보드_틀_백업.html 로 보관했습니다.')
-with open(OUT, 'w', encoding='utf-8', newline='\n') as f:
-    f.write(HTML)
+assert '/*__DATA__*/null' in HTML and '__TITLE__' in HTML, '틀 내용이 올바르지 않습니다. 코드 끝까지 복사했는지 확인하세요.'
+_old = os.path.exists(OUT)
+_bk = shutil.copy(OUT, '2-1_대시보드_틀_백업.html') if _old else None
+_f = open(OUT, 'w', encoding='utf-8', newline='\n'); _f.write(HTML); _f.close()
+print('기존 틀을 2-1_대시보드_틀_백업.html 로 보관했습니다.' if _old else '(기존 틀 없음)')
 print('완료:', os.path.abspath(OUT), '→ 이어서 2-1 청약현황 코드를 실행하세요.')
